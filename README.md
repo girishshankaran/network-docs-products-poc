@@ -75,6 +75,21 @@ node scripts/detect-impacts.js . --files products/router-ops/topics/configure-ss
 node scripts/detect-impacts.js . --files products/switch-manager/topics/configure-vlan.md --json
 ```
 
+## Automatic Publishing
+
+The workflow in `.github/workflows/publish.yml` runs on pushes to `main` and manual dispatches.
+
+It performs the production path:
+
+```text
+validate all products
+build the static site into site/
+upload the Pages artifact
+deploy with GitHub Pages
+```
+
+GitHub Pages must use GitHub Actions as the publishing source for the deployment to go live.
+
 ## Applicability Model
 
 Each topic still owns lifecycle metadata. The POC supports both explicit release lists and sequence-based lifecycle ranges.
