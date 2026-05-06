@@ -1,0 +1,5 @@
+product_id: router-ops
+display_name: Router Operations Manager
+base_path: /router-ops/
+release_model: numeric
+owners: ["router-docs-team"]

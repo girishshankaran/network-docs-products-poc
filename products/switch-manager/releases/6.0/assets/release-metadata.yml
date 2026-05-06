@@ -1,0 +1,7 @@
+release: "6.0"
+display_name: "Switch Manager 6.0"
+publish_path: "/switch-manager/6.0/"
+status: "supported"
+order: 600
+latest: true
+publish: true

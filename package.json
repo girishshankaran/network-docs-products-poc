@@ -1,0 +1,13 @@
+{
+  "name": "network-docs-products-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "POC for one documentation build engine across many products using product metadata and release sequence.",
+  "scripts": {
+    "validate": "node scripts/validate.js .",
+    "impact": "node scripts/detect-impacts.js .",
+    "build": "node scripts/build-site.js .",
+    "build:product": "node scripts/build-site.js . --product",
+    "demo:impact": "node scripts/detect-impacts.js . --files products/router-ops/topics/configure-ssh.md --json"
+  }
+}

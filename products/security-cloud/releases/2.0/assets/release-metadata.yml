@@ -1,0 +1,7 @@
+release: "2.0"
+display_name: "Security Cloud 2.0"
+publish_path: "/security-cloud/2.0/"
+status: "supported"
+order: 200
+latest: false
+publish: true

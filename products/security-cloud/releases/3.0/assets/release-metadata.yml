@@ -1,0 +1,7 @@
+release: "3.0"
+display_name: "Security Cloud 3.0"
+publish_path: "/security-cloud/3.0/"
+status: "supported"
+order: 300
+latest: true
+publish: true

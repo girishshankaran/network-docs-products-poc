@@ -1,0 +1,6 @@
+book_id: admin-guide
+title: Admin Guide
+sections:
+  - id: access
+    title: Access
+    topics: ["SECURITY-API-KEYS-TASK-001"]

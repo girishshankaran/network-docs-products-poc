@@ -1,0 +1,5 @@
+product_id: switch-manager
+display_name: Switch Manager
+base_path: /switch-manager/
+release_model: numeric
+owners: ["switch-docs-team"]

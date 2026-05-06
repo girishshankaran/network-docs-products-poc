@@ -1,0 +1,7 @@
+release: "19.0"
+display_name: "Router Operations Manager 19.0"
+publish_path: "/router-ops/19.0/"
+status: "supported"
+order: 1900
+latest: false
+publish: true

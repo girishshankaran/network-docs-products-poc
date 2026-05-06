@@ -1,0 +1,7 @@
+release: "20.0"
+display_name: "Router Operations Manager 20.0"
+publish_path: "/router-ops/20.0/"
+status: "supported"
+order: 2000
+latest: false
+publish: true

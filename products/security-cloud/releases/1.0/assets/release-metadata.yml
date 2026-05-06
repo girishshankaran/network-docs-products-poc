@@ -1,0 +1,7 @@
+release: "1.0"
+display_name: "Security Cloud 1.0"
+publish_path: "/security-cloud/1.0/"
+status: "supported"
+order: 100
+latest: false
+publish: true

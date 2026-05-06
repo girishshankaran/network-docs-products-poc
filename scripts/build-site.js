@@ -1,0 +1,389 @@
+const fs = require("fs");
+const path = require("path");
+const {
+  escapeHtml,
+  lifecycleAppliesToRelease,
+  loadProducts,
+  loadTopics,
+  parseArgs,
+  parseVersionAttrs,
+  releaseAcceptsUpdates,
+  releaseMatchesVersionBlock,
+  slugify,
+  topicIdsFromSections,
+} = require("./common");
+
+function ensureDir(dirPath) {
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function removeDir(dirPath) {
+  fs.rmSync(dirPath, { recursive: true, force: true });
+}
+
+function inlineMarkdown(value) {
+  return escapeHtml(value)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+function markdownToHtml(markdown) {
+  const html = [];
+  let paragraph = [];
+  let listType = null;
+
+  function flushParagraph() {
+    if (paragraph.length === 0) return;
+    html.push(`<p>${inlineMarkdown(paragraph.join(" "))}</p>`);
+    paragraph = [];
+  }
+
+  function closeList() {
+    if (!listType) return;
+    html.push(listType === "ol" ? "</ol>" : "</ul>");
+    listType = null;
+  }
+
+  for (const rawLine of markdown.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      closeList();
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      closeList();
+      const level = heading[1].length;
+      html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const ordered = line.match(/^\d+\.\s+(.+)$/);
+    if (ordered) {
+      flushParagraph();
+      if (listType !== "ol") {
+        closeList();
+        html.push("<ol>");
+        listType = "ol";
+      }
+      html.push(`<li>${inlineMarkdown(ordered[1])}</li>`);
+      continue;
+    }
+
+    const unordered = line.match(/^-\s+(.+)$/);
+    if (unordered) {
+      flushParagraph();
+      if (listType !== "ul") {
+        closeList();
+        html.push("<ul>");
+        listType = "ul";
+      }
+      html.push(`<li>${inlineMarkdown(unordered[1])}</li>`);
+      continue;
+    }
+
+    paragraph.push(line);
+  }
+
+  flushParagraph();
+  closeList();
+  return html.join("\n");
+}
+
+function renderVersionBlocks(markdown, product, release) {
+  return markdown
+    .replace(/:::version\s+([^\n]+)\n([\s\S]*?)\n:::/g, (_match, rawAttrs, content) => {
+      const block = { attrs: parseVersionAttrs(rawAttrs) };
+      return releaseMatchesVersionBlock(product, release, block) ? content.trim() : "";
+    })
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function page(title, body) {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f6f7f8;
+      --paper: #ffffff;
+      --ink: #17202a;
+      --muted: #5c6773;
+      --line: #d9dee5;
+      --accent: #176b87;
+      --accent-soft: #e7f4f8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+    header {
+      background: #17202a;
+      color: white;
+      padding: 14px 24px;
+    }
+    header a { color: white; text-decoration: none; }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+    h1, h2, h3 { margin: 0 0 12px; line-height: 1.18; }
+    h1 { font-size: 2.25rem; }
+    h2 { font-size: 1.35rem; margin-top: 22px; }
+    p { line-height: 1.65; margin: 0 0 14px; }
+    a { color: var(--accent); text-decoration: none; }
+    code {
+      background: #edf1f4;
+      border-radius: 4px;
+      padding: 2px 5px;
+    }
+    .hero, .panel, .topic {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .eyebrow {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .pill {
+      display: inline-flex;
+      background: var(--accent-soft);
+      color: #0d5267;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      margin: 4px 6px 0 0;
+    }
+    li { margin-bottom: 8px; line-height: 1.55; }
+    footer {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 20px 28px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <header><a href="/index.html">Multi-product Docs POC</a></header>
+  ${body}
+  <footer>Generated by the shared product-aware build engine.</footer>
+</body>
+</html>`;
+}
+
+function publishDir(siteDir, release) {
+  const normalized = String(release.metadata.publish_path).replace(/^\/+|\/+$/g, "");
+  return normalized ? path.join(siteDir, ...normalized.split("/")) : siteDir;
+}
+
+function defaultGuide(release) {
+  return release.guides.find((guide) => guide.isDefault) || release.guides[0];
+}
+
+function guideDir(siteDir, release, guide) {
+  const base = publishDir(siteDir, release);
+  if (guide === defaultGuide(release)) return base;
+  return path.join(base, guide.manifest.book_id || slugify(guide.manifest.title));
+}
+
+function buildTopicPage(product, release, guide, topic) {
+  const renderedBody = markdownToHtml(renderVersionBlocks(topic.body, product, release));
+  return page(
+    `${topic.title} - ${release.metadata.display_name}`,
+    `<main>
+      <article class="topic">
+        <div class="eyebrow">${escapeHtml(product.config.display_name)} / ${escapeHtml(release.releaseName)} / ${escapeHtml(guide.manifest.title)}</div>
+        ${topic.summary ? `<p>${escapeHtml(topic.summary)}</p>` : ""}
+        <p><strong>Topic ID:</strong> <code>${escapeHtml(topic.topicId)}</code></p>
+        ${renderedBody}
+      </article>
+    </main>`
+  );
+}
+
+function buildGuide(siteDir, product, release, guide, topics) {
+  const outputDir = guideDir(siteDir, release, guide);
+  ensureDir(outputDir);
+
+  const sections = (guide.manifest.sections || []).map((section) => {
+    const sectionTopics = (section.topics || [])
+      .map((topicId) => topics.get(topicId))
+      .filter((topic) => topic && lifecycleAppliesToRelease(product, topic.lifecycle, release));
+    return { ...section, topics: sectionTopics };
+  }).filter((section) => section.topics.length > 0);
+
+  for (const section of sections) {
+    for (const topic of section.topics) {
+      fs.writeFileSync(
+        path.join(outputDir, `${topic.slug}.html`),
+        buildTopicPage(product, release, guide, topic),
+        "utf8"
+      );
+    }
+  }
+
+  const toc = sections.map((section) => `
+    <section class="card">
+      <div class="eyebrow">${escapeHtml(section.title)}</div>
+      <ol>
+        ${section.topics.map((topic) => `<li><a href="./${topic.slug}.html">${escapeHtml(topic.title)}</a><br><span>${escapeHtml(topic.summary)}</span></li>`).join("")}
+      </ol>
+    </section>
+  `).join("");
+
+  fs.writeFileSync(
+    path.join(outputDir, "index.html"),
+    page(
+      `${guide.manifest.title} - ${release.metadata.display_name}`,
+      `<main>
+        <section class="hero">
+          <div class="eyebrow">${escapeHtml(product.config.display_name)}</div>
+          <h1>${escapeHtml(release.metadata.display_name)}</h1>
+          <p>${escapeHtml(guide.manifest.title)} built from product topics, release manifests, and release sequence metadata.</p>
+          <span class="pill">Release ${escapeHtml(release.releaseName)}</span>
+          <span class="pill">Order ${escapeHtml(release.order)}</span>
+          ${release.metadata.latest ? '<span class="pill">Latest</span>' : ""}
+        </section>
+        <section class="grid">${toc}</section>
+      </main>`
+    ),
+    "utf8"
+  );
+}
+
+function buildProductIndex(siteDir, product) {
+  const productPath = String(product.config.base_path || `/${product.productId}/`).replace(/^\/+|\/+$/g, "");
+  const outputDir = productPath ? path.join(siteDir, ...productPath.split("/")) : siteDir;
+  ensureDir(outputDir);
+  const releases = product.releases.filter(releaseAcceptsUpdates);
+  const cards = releases.map((release) => `
+    <article class="card">
+      <div class="eyebrow">Release</div>
+      <h2><a href="${release.releaseName}/index.html">${escapeHtml(release.metadata.display_name)}</a></h2>
+      <p>Release ID: <code>${escapeHtml(release.releaseName)}</code></p>
+      <p>Order: <code>${escapeHtml(release.order)}</code></p>
+      ${release.metadata.latest ? '<span class="pill">Latest</span>' : ""}
+    </article>
+  `).join("");
+
+  fs.writeFileSync(
+    path.join(outputDir, "index.html"),
+    page(
+      product.config.display_name,
+      `<main>
+        <section class="hero">
+          <div class="eyebrow">Product</div>
+          <h1>${escapeHtml(product.config.display_name)}</h1>
+          <p>Release model: <code>${escapeHtml(product.config.release_model)}</code></p>
+        </section>
+        <section class="grid">${cards}</section>
+      </main>`
+    ),
+    "utf8"
+  );
+}
+
+function buildHome(siteDir, products) {
+  const cards = products.map((product) => `
+    <article class="card">
+      <div class="eyebrow">Product</div>
+      <h2><a href="${product.productId}/index.html">${escapeHtml(product.config.display_name)}</a></h2>
+      <p>Release model: <code>${escapeHtml(product.config.release_model)}</code></p>
+      <p>${product.releases.length} release output(s)</p>
+    </article>
+  `).join("");
+
+  fs.writeFileSync(
+    path.join(siteDir, "index.html"),
+    page(
+      "Multi-product Docs POC",
+      `<main>
+        <section class="hero">
+          <div class="eyebrow">Shared build engine</div>
+          <h1>One build system, many product release models</h1>
+          <p>This site is generated from multiple products with different release number ranges using the same scripts.</p>
+        </section>
+        <section class="grid">${cards}</section>
+      </main>`
+    ),
+    "utf8"
+  );
+}
+
+function parseReleaseSelection(value) {
+  if (!value || value === true) return [];
+  return String(value).split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const repoRoot = path.resolve(args.root || args._[0] || ".");
+  const siteDir = path.join(repoRoot, "site");
+  const selectedProduct = args.product && args.product !== true ? String(args.product) : null;
+  const selectedReleases = new Set(parseReleaseSelection(args.releases || args.release));
+
+  removeDir(siteDir);
+  ensureDir(siteDir);
+
+  const products = loadProducts(repoRoot)
+    .filter((product) => !selectedProduct || product.productId === selectedProduct);
+
+  if (selectedProduct && products.length === 0) {
+    console.error(`Unknown product: ${selectedProduct}`);
+    process.exit(1);
+  }
+
+  let builtReleases = 0;
+  for (const product of products) {
+    const topics = loadTopics(product);
+    const releases = product.releases
+      .filter(releaseAcceptsUpdates)
+      .filter((release) => selectedReleases.size === 0 || selectedReleases.has(release.releaseName));
+
+    for (const release of releases) {
+      for (const guide of release.guides) {
+        buildGuide(siteDir, product, release, guide, topics);
+      }
+      builtReleases += 1;
+    }
+    buildProductIndex(siteDir, product);
+  }
+
+  buildHome(siteDir, products);
+  fs.writeFileSync(path.join(siteDir, ".nojekyll"), "", "utf8");
+  console.log(`Built ${builtReleases} release output(s) across ${products.length} product(s).`);
+}
+
+main();

@@ -1,0 +1,7 @@
+release: "5.0"
+display_name: "Switch Manager 5.0"
+publish_path: "/switch-manager/5.0/"
+status: "supported"
+order: 500
+latest: false
+publish: true

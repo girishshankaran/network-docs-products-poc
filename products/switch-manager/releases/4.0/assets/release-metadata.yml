@@ -1,0 +1,7 @@
+release: "4.0"
+display_name: "Switch Manager 4.0"
+publish_path: "/switch-manager/4.0/"
+status: "supported"
+order: 400
+latest: false
+publish: true
