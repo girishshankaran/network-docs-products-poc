@@ -83,12 +83,14 @@ It performs the production path:
 
 ```text
 validate all products
-build the static site into site/
-upload the Pages artifact
+detect impacted product/release outputs
+skip publish when no generated output is impacted
+build the complete static site into site/ when output is impacted
+upload the complete Pages artifact
 deploy with GitHub Pages
 ```
 
-GitHub Pages must use GitHub Actions as the publishing source for the deployment to go live.
+GitHub Pages artifact deployments replace the previous site, so the workflow still uploads a complete `site/` artifact when any product/release output is impacted. Impact detection controls whether publishing is needed and records which product/release outputs caused the publish.
 
 ## Applicability Model
 

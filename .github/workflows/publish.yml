@@ -17,9 +17,14 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      has_impacts: ${{ steps.impact.outputs.has_impacts }}
+      impact_matrix: ${{ steps.impact.outputs.impact_matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -29,19 +34,41 @@ jobs:
       - name: Validate product docs
         run: npm run validate
 
+      - name: Detect impacted product release outputs
+        id: impact
+        shell: bash
+        run: |
+          set -euo pipefail
+          zero_sha="0000000000000000000000000000000000000000"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            node scripts/detect-impacts.js . --all
+          elif [ "${{ github.event.before }}" = "$zero_sha" ]; then
+            node scripts/detect-impacts.js . --all
+          else
+            node scripts/detect-impacts.js . --base "${{ github.event.before }}" --head "${{ github.sha }}"
+          fi
+
+      - name: Skip publish when no generated output changed
+        if: steps.impact.outputs.has_impacts != 'true'
+        run: echo "No product release outputs were impacted; skipping Pages build and deploy."
+
       - name: Build static site
+        if: steps.impact.outputs.has_impacts == 'true'
         run: npm run build
 
       - name: Configure Pages
+        if: steps.impact.outputs.has_impacts == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
+        if: steps.impact.outputs.has_impacts == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
   deploy:
     needs: build
+    if: needs.build.outputs.has_impacts == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
