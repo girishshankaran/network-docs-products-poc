@@ -8,6 +8,7 @@
     "impact": "node scripts/detect-impacts.js .",
     "build": "node scripts/build-site.js .",
     "build:product": "node scripts/build-site.js . --product",
-    "demo:impact": "node scripts/detect-impacts.js . --files products/router-ops/topics/configure-ssh-20-0.md --json"
+    "demo:impact": "node scripts/detect-impacts.js . --files products/router-ops/topics/configure-ssh-20-0.md --json",
+    "create:variant": "node scripts/create-topic-variant.js ."
   }
 }

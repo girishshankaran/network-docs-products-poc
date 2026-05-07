@@ -114,6 +114,25 @@ node scripts/detect-impacts.js . --files products/router-ops/topics/configure-ss
 node scripts/detect-impacts.js . --files products/switch-manager/topics/configure-vlan-5-0.md --json
 ```
 
+Create a new Approach B topic variant:
+
+```sh
+node scripts/create-topic-variant.js . \
+  --product router-ops \
+  --from-topic ROUTER-SSH-TASK-002 \
+  --release 21.0 \
+  --update-manifests
+```
+
+The script:
+
+- copies the source topic into a new release-suffixed file
+- assigns the next `topic_id` in the topic family
+- keeps the same `retrieval.dedupe_key`
+- points the older variant at the new variant with `lifecycle.replaced_by`
+- updates target release manifests when `--update-manifests` is used
+- supports `--dry-run` to preview the planned changes
+
 ## Automatic Publishing
 
 The workflow in `.github/workflows/publish.yml` runs on pushes to `main` and manual dispatches.
