@@ -12,6 +12,7 @@ lifecycle:
 retrieval:
   is_canonical: true
   dedupe_key: router-configure-snmp
+  allow_in_ai_results: true
 ---
 
 # Configure SNMP monitoring

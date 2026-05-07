@@ -243,6 +243,7 @@ function loadTopics(product) {
       summary: topicDocument.frontmatter.summary || "",
       contentType: topicDocument.frontmatter.content_type || "",
       lifecycle: topicDocument.frontmatter.lifecycle || {},
+      retrieval: topicDocument.frontmatter.retrieval || {},
     });
   }
 
@@ -266,16 +267,6 @@ function compareByOrder(product, leftReleaseId, rightReleaseId) {
   return 0;
 }
 
-function parseVersionAttrs(rawAttrs) {
-  const attrs = {};
-  const pattern = /([a-z_]+)="([^"]*)"/g;
-  let match;
-  while ((match = pattern.exec(rawAttrs)) !== null) {
-    attrs[match[1]] = match[2];
-  }
-  return attrs;
-}
-
 function versionBlocks(topic) {
   const blocks = [];
   const lines = topic.body.split(/\r?\n/);
@@ -286,9 +277,7 @@ function versionBlocks(topic) {
     const closingIndex = lines.findIndex((candidate, candidateIndex) => candidateIndex > index && candidate === ":::");
     blocks.push({
       lineNumber: topic.bodyStartLine + index,
-      attrs: parseVersionAttrs(open[1]),
       rawAttrs: open[1],
-      content: closingIndex === -1 ? "" : lines.slice(index + 1, closingIndex).join("\n").trim(),
       missingClose: closingIndex === -1,
     });
     if (closingIndex !== -1) index = closingIndex;
@@ -296,33 +285,13 @@ function versionBlocks(topic) {
   return blocks;
 }
 
-function versionBlockRefs(block) {
-  return ["only", "from", "until"]
-    .map((key) => block.attrs[key])
-    .filter(Boolean);
-}
-
-function releaseMatchesVersionBlock(product, release, block) {
-  const attrs = block.attrs;
-  if (attrs.only) return release.releaseName === attrs.only;
-
-  if (attrs.from) {
-    const from = releaseById(product, attrs.from);
-    if (!from || release.order < from.order) return false;
-  }
-
-  if (attrs.until) {
-    const until = releaseById(product, attrs.until);
-    if (!until || release.order > until.order) return false;
-  }
-
-  return Boolean(attrs.from || attrs.until);
-}
-
 function lifecycleRefs(lifecycle) {
   const refs = [];
   if (lifecycle.introduced_in) refs.push(lifecycle.introduced_in);
   if (lifecycle.removed_in) refs.push(lifecycle.removed_in);
+  if (lifecycle.deprecated_in) refs.push(lifecycle.deprecated_in);
+  if (Array.isArray(lifecycle.updated_in)) refs.push(...lifecycle.updated_in);
+  if (typeof lifecycle.updated_in === "string") refs.push(lifecycle.updated_in);
 
   const appliesTo = lifecycle.applies_to;
   if (Array.isArray(appliesTo)) refs.push(...appliesTo);
@@ -417,13 +386,10 @@ module.exports = {
   normalizePath,
   parseArgs,
   parseTopicDocument,
-  parseVersionAttrs,
   readYaml,
   releaseAcceptsUpdates,
   releaseById,
-  releaseMatchesVersionBlock,
   slugify,
   topicIdsFromSections,
-  versionBlockRefs,
   versionBlocks,
 };

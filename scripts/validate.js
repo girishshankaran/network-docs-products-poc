@@ -6,9 +6,6 @@ const {
   loadProducts,
   loadTopics,
   parseArgs,
-  releaseById,
-  topicIdsFromSections,
-  versionBlockRefs,
   versionBlocks,
 } = require("./common");
 
@@ -81,45 +78,70 @@ function validateLifecycleRefs(repoRoot, product, topic, issues) {
   }
 }
 
-function validateVersionBlocks(repoRoot, product, topic, issues) {
+function validateRetrieval(repoRoot, topic, issues) {
+  const label = rel(repoRoot, topic.path);
+  if (!topic.retrieval || typeof topic.retrieval !== "object") {
+    issues.push(`${label}: missing retrieval object`);
+    return;
+  }
+  if (!topic.retrieval.dedupe_key || typeof topic.retrieval.dedupe_key !== "string") {
+    issues.push(`${label}: retrieval.dedupe_key is required for Approach B topic-family grouping`);
+  }
+  if (topic.retrieval.allow_in_ai_results !== undefined && typeof topic.retrieval.allow_in_ai_results !== "boolean") {
+    issues.push(`${label}: retrieval.allow_in_ai_results must be true or false when specified`);
+  }
+}
+
+function validateNoVersionBlocks(repoRoot, topic, issues) {
   for (const block of versionBlocks(topic)) {
     const label = `${rel(repoRoot, topic.path)}:${block.lineNumber}`;
     if (block.missingClose) {
       issues.push(`${label}: version block is missing closing ::: marker`);
       continue;
     }
+    issues.push(`${label}: Approach B disallows inline version annotations; create a new topic file with a new topic_id and the same retrieval.dedupe_key`);
+  }
+}
 
-    const hasOnly = Boolean(block.attrs.only);
-    const hasRange = Boolean(block.attrs.from || block.attrs.until);
-    if (!hasOnly && !hasRange) {
-      issues.push(`${label}: version block must use only=\"release\", from=\"release\", or until=\"release\"`);
+function validateReplacements(repoRoot, topics, issues) {
+  for (const topic of topics.values()) {
+    const replacementId = topic.lifecycle?.replaced_by;
+    if (!replacementId) continue;
+    const label = rel(repoRoot, topic.path);
+    const replacement = topics.get(replacementId);
+    if (!replacement) {
+      issues.push(`${label}: lifecycle.replaced_by references missing topic "${replacementId}"`);
+      continue;
     }
-    if (hasOnly && hasRange) {
-      issues.push(`${label}: version block cannot combine only with from/until`);
+    if (replacementId === topic.topicId) {
+      issues.push(`${label}: lifecycle.replaced_by must not reference the same topic_id`);
     }
+    if (topic.retrieval?.dedupe_key && replacement.retrieval?.dedupe_key && topic.retrieval.dedupe_key !== replacement.retrieval.dedupe_key) {
+      issues.push(`${label}: lifecycle.replaced_by "${replacementId}" must share retrieval.dedupe_key "${topic.retrieval.dedupe_key}"`);
+    }
+  }
+}
 
-    for (const releaseId of versionBlockRefs(block)) {
-      if (!releaseById(product, releaseId)) {
-        issues.push(`${label}: version block references unknown release "${releaseId}" for product ${product.productId}`);
+function validateDedupeFamilies(repoRoot, product, topics, issues) {
+  const families = new Map();
+  for (const topic of topics.values()) {
+    const dedupeKey = topic.retrieval?.dedupe_key;
+    if (!dedupeKey) continue;
+    if (!families.has(dedupeKey)) families.set(dedupeKey, []);
+    families.get(dedupeKey).push(topic);
+  }
+
+  for (const [dedupeKey, familyTopics] of families.entries()) {
+    for (let leftIndex = 0; leftIndex < familyTopics.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < familyTopics.length; rightIndex += 1) {
+        const left = familyTopics[leftIndex];
+        const right = familyTopics[rightIndex];
+        const leftAppliesTo = new Set(applicableReleaseNames(product, left));
+        const overlap = applicableReleaseNames(product, right).filter((releaseName) => leftAppliesTo.has(releaseName));
+        if (overlap.length > 0) {
+          issues.push(`${rel(repoRoot, right.path)}: dedupe_key "${dedupeKey}" overlaps ${rel(repoRoot, left.path)} for release(s) ${overlap.join(", ")}`);
+        }
       }
-    }
-
-    const matchedReleases = product.releases.filter((release) => {
-      const refsKnown = versionBlockRefs(block).every((releaseId) => releaseById(product, releaseId));
-      if (!refsKnown) return false;
-      const { releaseMatchesVersionBlock } = require("./common");
-      return releaseMatchesVersionBlock(product, release, block);
-    });
-
-    if (matchedReleases.length === 0 && versionBlockRefs(block).every((releaseId) => releaseById(product, releaseId))) {
-      issues.push(`${label}: version block does not match any release`);
-    }
-
-    const outsideLifecycle = matchedReleases
-      .filter((release) => !lifecycleAppliesToRelease(product, topic.lifecycle, release))
-      .map((release) => release.releaseName);
-    if (outsideLifecycle.length > 0) {
-      issues.push(`${label}: version block matches release(s) outside lifecycle: ${outsideLifecycle.join(", ")}`);
     }
   }
 }
@@ -135,10 +157,13 @@ function validateTopics(repoRoot, product, issues) {
     if (topicIds.has(topic.topicId)) issues.push(`${label}: duplicate topic_id "${topic.topicId}"`);
     topicIds.add(topic.topicId);
     if (!topic.lifecycle || typeof topic.lifecycle !== "object") issues.push(`${label}: missing lifecycle object`);
+    validateRetrieval(repoRoot, topic, issues);
     validateLifecycleRefs(repoRoot, product, topic, issues);
-    validateVersionBlocks(repoRoot, product, topic, issues);
+    validateNoVersionBlocks(repoRoot, topic, issues);
   }
 
+  validateReplacements(repoRoot, topics, issues);
+  validateDedupeFamilies(repoRoot, product, topics, issues);
   return topics;
 }
 
@@ -158,6 +183,7 @@ function validateManifests(repoRoot, product, topics, issues) {
 
       const sections = requireArray(guide.manifest.sections, `${label} sections`, issues);
       const seenInGuide = new Set();
+      const seenDedupeInGuide = new Map();
       for (const section of sections) {
         if (!section.id) issues.push(`${label}: section is missing id`);
         if (!section.title) issues.push(`${label}: section "${section.id || "(missing id)"}" is missing title`);
@@ -171,6 +197,14 @@ function validateManifests(repoRoot, product, topics, issues) {
           }
           if (!lifecycleAppliesToRelease(product, topic.lifecycle, release)) {
             issues.push(`${label}: references topic "${topicId}" for ${release.releaseName}, but topic lifecycle does not apply`);
+          }
+          const dedupeKey = topic.retrieval?.dedupe_key;
+          if (dedupeKey) {
+            if (seenDedupeInGuide.has(dedupeKey)) {
+              issues.push(`${label}: release ${release.releaseName} includes multiple topic variants with dedupe_key "${dedupeKey}" (${seenDedupeInGuide.get(dedupeKey)}, ${topicId})`);
+            } else {
+              seenDedupeInGuide.set(dedupeKey, topicId);
+            }
           }
         }
       }

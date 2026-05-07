@@ -3,7 +3,7 @@ title: Admin Guide
 sections:
   - id: switching
     title: Switching
-    topics: ["SWITCH-VLAN-TASK-001"]
+    topics: ["SWITCH-VLAN-TASK-002"]
   - id: onboarding
     title: Onboarding
-    topics: ["SWITCH-ONBOARD-TASK-001"]
+    topics: ["SWITCH-ONBOARD-TASK-002"]

@@ -6,11 +6,8 @@ const {
   loadProducts,
   loadTopics,
   parseArgs,
-  parseVersionAttrs,
   releaseAcceptsUpdates,
-  releaseMatchesVersionBlock,
   slugify,
-  topicIdsFromSections,
 } = require("./common");
 
 function ensureDir(dirPath) {
@@ -91,16 +88,6 @@ function markdownToHtml(markdown) {
   flushParagraph();
   closeList();
   return html.join("\n");
-}
-
-function renderVersionBlocks(markdown, product, release) {
-  return markdown
-    .replace(/:::version\s+([^\n]+)\n([\s\S]*?)\n:::/g, (_match, rawAttrs, content) => {
-      const block = { attrs: parseVersionAttrs(rawAttrs) };
-      return releaseMatchesVersionBlock(product, release, block) ? content.trim() : "";
-    })
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
 
 function page(title, body) {
@@ -219,7 +206,7 @@ function guideDir(siteDir, release, guide) {
 }
 
 function buildTopicPage(product, release, guide, topic) {
-  const renderedBody = markdownToHtml(renderVersionBlocks(topic.body, product, release));
+  const renderedBody = markdownToHtml(topic.body);
   return page(
     `${topic.title} - ${release.metadata.display_name}`,
     `<main>

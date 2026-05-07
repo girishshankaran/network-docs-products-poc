@@ -11,6 +11,13 @@ The important idea is that product differences are modeled as data:
 - `products/<product>/releases/<release>/manifests/*.yml` assembles guides for that release.
 - `scripts/` contains shared validation, impact detection, and static site generation.
 
+This POC uses Approach B from the topic-ID handling proposal:
+
+- meaningful topic updates create a new topic file and a new `topic_id`
+- related variants share the same `retrieval.dedupe_key`
+- release manifests select the correct topic variant for each release
+- inline version annotations are disallowed
+
 This repo intentionally includes three products with different release numbering ranges:
 
 | Product | Release style | Example releases |
@@ -34,19 +41,51 @@ latest: false
 publish: true
 ```
 
-Then a topic can use version annotations without relying on numeric release names:
+Then topic lifecycle can use sequence-based applicability without relying on one global release sequence:
 
-```md
-:::version from="5.0"
-Use the redesigned workflow.
-:::
+```yml
+lifecycle:
+  introduced_in: "5.0"
+  applies_to:
+    from: "5.0"
+    except: []
 ```
 
-The shared build engine evaluates that as:
+The shared build engine evaluates that within the product:
 
 ```text
-include this block for Switch Manager releases whose order is >= 5.0.order
+include this topic variant for Switch Manager releases whose order is >= 5.0.order
 ```
+
+## Approach B Topic Variants
+
+A meaningful workflow change creates a new topic variant.
+
+```text
+products/switch-manager/topics/configure-vlan-4-0.md
+  topic_id: SWITCH-VLAN-TASK-001
+  dedupe_key: switch-configure-vlans
+  applies_to: ["4.0"]
+
+products/switch-manager/topics/configure-vlan-5-0.md
+  topic_id: SWITCH-VLAN-TASK-002
+  dedupe_key: switch-configure-vlans
+  applies_to: from "5.0"
+```
+
+Release manifests choose the variant:
+
+```yml
+# products/switch-manager/releases/4.0/manifests/admin-guide.yml
+topics: ["SWITCH-VLAN-TASK-001"]
+```
+
+```yml
+# products/switch-manager/releases/5.0/manifests/admin-guide.yml
+topics: ["SWITCH-VLAN-TASK-002"]
+```
+
+The `dedupe_key` groups the variants for retrieval and governance, while `topic_id` identifies the exact release-specific topic file.
 
 ## Commands
 
@@ -71,8 +110,8 @@ node scripts/build-site.js . --product switch-manager
 Detect impacts from changed files:
 
 ```sh
-node scripts/detect-impacts.js . --files products/router-ops/topics/configure-ssh.md --json
-node scripts/detect-impacts.js . --files products/switch-manager/topics/configure-vlan.md --json
+node scripts/detect-impacts.js . --files products/router-ops/topics/configure-ssh-20-0.md --json
+node scripts/detect-impacts.js . --files products/switch-manager/topics/configure-vlan-5-0.md --json
 ```
 
 ## Automatic Publishing
@@ -120,6 +159,14 @@ The release manifest still controls guide placement. A topic appears only when:
 
 1. The release manifest includes the topic ID.
 2. The topic lifecycle applies to that release.
+
+Validation also enforces Approach B rules:
+
+- every topic must have `retrieval.dedupe_key`
+- topic variants sharing a `dedupe_key` must not overlap in the same release
+- a release guide must not include multiple variants with the same `dedupe_key`
+- `lifecycle.replaced_by` must point to an existing topic in the same topic family
+- `:::version` annotations are rejected
 
 ## Scaling Pattern
 
