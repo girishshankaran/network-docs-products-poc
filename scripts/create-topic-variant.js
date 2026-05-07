@@ -114,14 +114,20 @@ function updateSourceLifecycle(sourceText, sourceTopic, releaseName, newTopicId,
     if (!candidateRelease || !newRelease) return candidate !== releaseName;
     return candidateRelease.order < newRelease.order;
   });
+  const appliesTo = remaining.length > 0
+    ? remaining
+    : currentAppliesTo.filter((candidate) => candidate === releaseName);
+  const status = appliesTo.length === remaining.length && remaining.length > 0
+    ? sourceTopic.lifecycle.status || "active"
+    : "replaced";
 
   const replacement = [
     "lifecycle:",
-    `  introduced_in: ${scalar(sourceTopic.lifecycle.introduced_in || remaining[0] || releaseName)}`,
+    `  introduced_in: ${scalar(sourceTopic.lifecycle.introduced_in || appliesTo[0] || releaseName)}`,
     "  removed_in: null",
-    `  status: ${sourceTopic.lifecycle.status || "active"}`,
+    `  status: ${status}`,
     `  replaced_by: ${newTopicId}`,
-    `  applies_to: ${yamlList(remaining)}`,
+    `  applies_to: ${yamlList(appliesTo)}`,
     "retrieval:",
   ].join("\n");
 

@@ -7,8 +7,8 @@ owner: Security Cloud Docs
 lifecycle:
   introduced_in: "1.0"
   removed_in: null
-  status: active
-  replaced_by: SECURITY-API-KEYS-TASK-002
+  status: replaced
+  replaced_by: SECURITY-API-KEYS-TASK-003
   applies_to: ["1.0"]
 retrieval:
   is_canonical: true

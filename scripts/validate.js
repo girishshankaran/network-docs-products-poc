@@ -122,6 +122,10 @@ function validateReplacements(repoRoot, topics, issues) {
   }
 }
 
+function isReplacedTopic(topic) {
+  return String(topic.lifecycle?.status || "").toLowerCase() === "replaced";
+}
+
 function validateDedupeFamilies(repoRoot, product, topics, issues) {
   const families = new Map();
   for (const topic of topics.values()) {
@@ -132,10 +136,11 @@ function validateDedupeFamilies(repoRoot, product, topics, issues) {
   }
 
   for (const [dedupeKey, familyTopics] of families.entries()) {
-    for (let leftIndex = 0; leftIndex < familyTopics.length; leftIndex += 1) {
-      for (let rightIndex = leftIndex + 1; rightIndex < familyTopics.length; rightIndex += 1) {
-        const left = familyTopics[leftIndex];
-        const right = familyTopics[rightIndex];
+    const activeTopics = familyTopics.filter((topic) => !isReplacedTopic(topic));
+    for (let leftIndex = 0; leftIndex < activeTopics.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < activeTopics.length; rightIndex += 1) {
+        const left = activeTopics[leftIndex];
+        const right = activeTopics[rightIndex];
         const leftAppliesTo = new Set(applicableReleaseNames(product, left));
         const overlap = applicableReleaseNames(product, right).filter((releaseName) => leftAppliesTo.has(releaseName));
         if (overlap.length > 0) {
