@@ -8,10 +8,8 @@ lifecycle:
   introduced_in: "20.0"
   removed_in: null
   status: active
-  replaced_by: null
-  applies_to:
-    from: "20.0"
-    except: []
+  replaced_by: ROUTER-SSH-TASK-003
+  applies_to: ["20.0"]
 retrieval:
   is_canonical: true
   dedupe_key: router-configure-ssh
