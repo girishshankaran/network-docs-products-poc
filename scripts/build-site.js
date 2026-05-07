@@ -293,7 +293,7 @@ function buildProductIndex(siteDir, product) {
         <section class="hero">
           <div class="eyebrow">Product</div>
           <h1>${escapeHtml(product.config.display_name)}</h1>
-          <p>Release model: <code>${escapeHtml(product.config.release_model)}</code></p>
+          <p>${releases.length} release output(s), ordered by each release's metadata.</p>
         </section>
         <section class="grid">${cards}</section>
       </main>`
@@ -307,7 +307,7 @@ function buildHome(siteDir, products) {
     <article class="card">
       <div class="eyebrow">Product</div>
       <h2><a href="${product.productId}/index.html">${escapeHtml(product.config.display_name)}</a></h2>
-      <p>Release model: <code>${escapeHtml(product.config.release_model)}</code></p>
+      <p>Release sequence is metadata-driven through each release <code>order</code>.</p>
       <p>${product.releases.length} release output(s)</p>
     </article>
   `).join("");

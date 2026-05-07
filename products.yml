@@ -2,12 +2,9 @@ products:
   - id: router-ops
     path: products/router-ops
     display_name: Router Operations Manager
-    release_model: numeric
   - id: switch-manager
     path: products/switch-manager
     display_name: Switch Manager
-    release_model: numeric
   - id: security-cloud
     path: products/security-cloud
     display_name: Security Cloud
-    release_model: numeric

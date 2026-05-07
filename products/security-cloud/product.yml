@@ -1,5 +1,4 @@
 product_id: security-cloud
 display_name: Security Cloud
 base_path: /security-cloud/
-release_model: numeric
 owners: ["security-cloud-docs"]
