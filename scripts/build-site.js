@@ -281,9 +281,8 @@ function buildGuide(siteDir, product, release, guide, topics, ledger) {
         <section class="hero">
           <div class="eyebrow">${escapeHtml(product.config.display_name)}</div>
           <h1>${escapeHtml(release.metadata.display_name)}</h1>
-          <p>${escapeHtml(guide.manifest.title)} built from product topics, release manifests, and release sequence metadata.</p>
+          <p>${escapeHtml(guide.manifest.title)} built from product topics and release manifests.</p>
           <span class="pill">Release ${escapeHtml(release.releaseName)}</span>
-          <span class="pill">Order ${escapeHtml(release.order)}</span>
           ${release.metadata.latest ? '<span class="pill">Latest</span>' : ""}
         </section>
         <section class="grid">${toc}</section>
@@ -303,7 +302,6 @@ function buildProductIndex(siteDir, product) {
       <div class="eyebrow">Release</div>
       <h2><a href="${release.releaseName}/index.html">${escapeHtml(release.metadata.display_name)}</a></h2>
       <p>Release ID: <code>${escapeHtml(release.releaseName)}</code></p>
-      <p>Order: <code>${escapeHtml(release.order)}</code></p>
       ${release.metadata.latest ? '<span class="pill">Latest</span>' : ""}
     </article>
   `).join("");
@@ -316,7 +314,7 @@ function buildProductIndex(siteDir, product) {
         <section class="hero">
           <div class="eyebrow">Product</div>
           <h1>${escapeHtml(product.config.display_name)}</h1>
-          <p>${releases.length} release output(s), ordered by each release's metadata.</p>
+          <p>${releases.length} release output(s).</p>
         </section>
         <section class="grid">${cards}</section>
       </main>`
@@ -330,7 +328,7 @@ function buildHome(siteDir, products) {
     <article class="card">
       <div class="eyebrow">Product</div>
       <h2><a href="${product.productId}/index.html">${escapeHtml(product.config.display_name)}</a></h2>
-      <p>Release sequence is metadata-driven through each release <code>order</code>.</p>
+      <p>Generated from product metadata and release manifests.</p>
       <p>${product.releases.length} release output(s)</p>
     </article>
   `).join("");
