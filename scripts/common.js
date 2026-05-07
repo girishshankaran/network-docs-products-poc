@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const defaultManifestFile = "admin-guide.yml";
 
@@ -358,6 +359,23 @@ function releaseAcceptsUpdates(release) {
   return release.metadata.publish !== false;
 }
 
+function sha256(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function normalizeTopicBody(value) {
+  return String(value || "").replace(/\r\n/g, "\n").trim();
+}
+
+function topicRenderedContentHash(topic) {
+  return sha256(JSON.stringify({
+    title: topic.title || "",
+    summary: topic.summary || "",
+    content_type: topic.contentType || "",
+    body: normalizeTopicBody(topic.body),
+  }));
+}
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -390,6 +408,7 @@ module.exports = {
   releaseAcceptsUpdates,
   releaseById,
   slugify,
+  topicRenderedContentHash,
   topicIdsFromSections,
   versionBlocks,
 };

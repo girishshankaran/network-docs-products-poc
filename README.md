@@ -17,6 +17,7 @@ This POC uses Approach B from the topic-ID handling proposal:
 - related variants share the same `retrieval.dedupe_key`
 - release manifests select the correct topic variant for each release
 - inline version annotations are disallowed
+- a published topic is identified from the last successful `publish-ledger.json`, not from Git history alone
 
 This repo intentionally includes three products with different release numbering ranges:
 
@@ -133,6 +134,21 @@ The script:
 - updates target release manifests when `--update-manifests` is used
 - supports `--dry-run` to preview the planned changes
 
+Check whether a changed topic is already published:
+
+```sh
+npm run build
+npm run enforce:topic-policy -- \
+  --ledger site/publish-ledger.json \
+  --files products/router-ops/topics/configure-ssh-20-0.md
+```
+
+The build writes `site/publish-ledger.json`. That ledger records the exact topic IDs, release outputs, source paths, URLs, and rendered-content hashes that were included in the generated site. After GitHub Pages deploys successfully, that published ledger becomes the source of truth for whether a topic is published.
+
+The enforcement script compares changed topic files with the last published ledger. If a topic ID is already published for the same product and release, and its rendered content changes in place, the script fails and tells the author to create a new topic variant. Lifecycle-only metadata changes, such as setting `replaced_by` on the older topic, do not change the rendered-content hash.
+
+Because a script cannot reliably decide whether a prose edit is "significant", this POC uses a conservative policy: rendered-content changes to published topics require a new topic ID. Draft topics that are not in the published ledger can continue using the same topic ID while authors iterate.
+
 ## Automatic Publishing
 
 The workflow in `.github/workflows/publish.yml` runs on pushes to `main` and manual dispatches.
@@ -141,9 +157,11 @@ It performs the production path:
 
 ```text
 validate all products
+enforce published topic ID policy against the last deployed publish ledger
 detect impacted product/release outputs
 skip publish when no generated output is impacted
 build the complete static site into site/ when output is impacted
+write site/publish-ledger.json with all generated topic outputs
 upload the complete Pages artifact
 deploy with GitHub Pages
 ```

@@ -31,7 +31,8 @@ The scripts do the same work for every product:
 3. Build a release registry keyed by release ID.
 4. Validate topic lifecycle and topic-family metadata against that registry.
 5. Render release outputs from manifests and topic metadata.
-6. Detect changed-file impacts at product and release granularity.
+6. Write a publish ledger that records generated topic IDs, release outputs, URLs, and rendered-content hashes.
+7. Detect changed-file impacts at product and release granularity.
 
 ## Release Sequence
 
@@ -91,6 +92,28 @@ Release manifests select variants explicitly:
 ```
 
 The build does not render conditional content inside a topic. It renders the topic file selected by the manifest after lifecycle validation.
+
+## Published Topic Enforcement
+
+Git commits are not treated as publication events. A topic is considered published only when it appears in `publish-ledger.json` from a successful site deployment.
+
+Each ledger entry records:
+
+```json
+{
+  "product_id": "router-ops",
+  "release": "21.0",
+  "topic_id": "ROUTER-SSH-TASK-003",
+  "dedupe_key": "router-configure-ssh",
+  "source_path": "products/router-ops/topics/configure-ssh-21-0.md",
+  "url_path": "/router-ops/21.0/configure-ssh-21-0.html",
+  "content_hash": "..."
+}
+```
+
+The enforcement script compares changed topic files against that ledger. If the same `topic_id` is still selected for the same product and release, and its rendered content hash changes, CI fails. The author must create a new topic variant with a new `topic_id` and update the release manifest.
+
+The rendered-content hash includes the title, summary, content type, and Markdown body. It intentionally excludes lifecycle metadata so that replacing an older topic with `lifecycle.replaced_by` does not count as an in-place content update.
 
 ## Impact Detection
 

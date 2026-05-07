@@ -5,6 +5,7 @@
   "description": "POC for one documentation build engine across many products using product metadata and release sequence.",
   "scripts": {
     "validate": "node scripts/validate.js .",
+    "enforce:topic-policy": "node scripts/enforce-topic-id-policy.js .",
     "impact": "node scripts/detect-impacts.js .",
     "build": "node scripts/build-site.js .",
     "build:product": "node scripts/build-site.js . --product",

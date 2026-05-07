@@ -34,6 +34,21 @@ jobs:
       - name: Validate product docs
         run: npm run validate
 
+      - name: Enforce published topic ID policy
+        shell: bash
+        env:
+          PUBLISH_LEDGER_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/publish-ledger.json
+        run: |
+          set -euo pipefail
+          zero_sha="0000000000000000000000000000000000000000"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            node scripts/enforce-topic-id-policy.js . --ledger-url "$PUBLISH_LEDGER_URL" --all
+          elif [ "${{ github.event.before }}" = "$zero_sha" ]; then
+            node scripts/enforce-topic-id-policy.js . --ledger-url "$PUBLISH_LEDGER_URL" --all
+          else
+            node scripts/enforce-topic-id-policy.js . --ledger-url "$PUBLISH_LEDGER_URL" --base "${{ github.event.before }}" --head "${{ github.sha }}"
+          fi
+
       - name: Detect impacted product release outputs
         id: impact
         shell: bash

@@ -8,6 +8,7 @@ const {
   parseArgs,
   releaseAcceptsUpdates,
   slugify,
+  topicRenderedContentHash,
 } = require("./common");
 
 function ensureDir(dirPath) {
@@ -205,6 +206,26 @@ function guideDir(siteDir, release, guide) {
   return path.join(base, guide.manifest.book_id || slugify(guide.manifest.title));
 }
 
+function outputUrlPath(siteDir, filePath) {
+  return `/${path.relative(siteDir, filePath).replace(/\\/g, "/")}`;
+}
+
+function ledgerEntry(siteDir, outputPath, product, release, guide, topic) {
+  return {
+    product_id: product.productId,
+    release: release.releaseName,
+    guide_id: guide.manifest.book_id,
+    guide_title: guide.manifest.title,
+    topic_id: topic.topicId,
+    dedupe_key: topic.retrieval?.dedupe_key || null,
+    title: topic.title,
+    source_path: `products/${product.productId}/${topic.relativePath}`,
+    output_path: path.relative(siteDir, outputPath).replace(/\\/g, "/"),
+    url_path: outputUrlPath(siteDir, outputPath),
+    content_hash: topicRenderedContentHash(topic),
+  };
+}
+
 function buildTopicPage(product, release, guide, topic) {
   const renderedBody = markdownToHtml(topic.body);
   return page(
@@ -220,7 +241,7 @@ function buildTopicPage(product, release, guide, topic) {
   );
 }
 
-function buildGuide(siteDir, product, release, guide, topics) {
+function buildGuide(siteDir, product, release, guide, topics, ledger) {
   const outputDir = guideDir(siteDir, release, guide);
   ensureDir(outputDir);
 
@@ -233,11 +254,13 @@ function buildGuide(siteDir, product, release, guide, topics) {
 
   for (const section of sections) {
     for (const topic of section.topics) {
+      const outputPath = path.join(outputDir, `${topic.slug}.html`);
       fs.writeFileSync(
-        path.join(outputDir, `${topic.slug}.html`),
+        outputPath,
         buildTopicPage(product, release, guide, topic),
         "utf8"
       );
+      ledger.topics.push(ledgerEntry(siteDir, outputPath, product, release, guide, topic));
     }
   }
 
@@ -329,6 +352,27 @@ function buildHome(siteDir, products) {
   );
 }
 
+function writePublishLedger(siteDir, ledger) {
+  ledger.topics.sort((left, right) => (
+    left.product_id.localeCompare(right.product_id)
+    || left.release.localeCompare(right.release, undefined, { numeric: true })
+    || left.guide_id.localeCompare(right.guide_id)
+    || left.topic_id.localeCompare(right.topic_id)
+  ));
+
+  fs.writeFileSync(
+    path.join(siteDir, "publish-ledger.json"),
+    `${JSON.stringify({
+      schema_version: 1,
+      generated_at: new Date().toISOString(),
+      source_commit: process.env.GITHUB_SHA || null,
+      workflow_run: process.env.GITHUB_RUN_ID || null,
+      topics: ledger.topics,
+    }, null, 2)}\n`,
+    "utf8"
+  );
+}
+
 function parseReleaseSelection(value) {
   if (!value || value === true) return [];
   return String(value).split(",").map((item) => item.trim()).filter(Boolean);
@@ -340,6 +384,7 @@ function main() {
   const siteDir = path.join(repoRoot, "site");
   const selectedProduct = args.product && args.product !== true ? String(args.product) : null;
   const selectedReleases = new Set(parseReleaseSelection(args.releases || args.release));
+  const ledger = { topics: [] };
 
   removeDir(siteDir);
   ensureDir(siteDir);
@@ -361,7 +406,7 @@ function main() {
 
     for (const release of releases) {
       for (const guide of release.guides) {
-        buildGuide(siteDir, product, release, guide, topics);
+        buildGuide(siteDir, product, release, guide, topics, ledger);
       }
       builtReleases += 1;
     }
@@ -369,6 +414,7 @@ function main() {
   }
 
   buildHome(siteDir, products);
+  writePublishLedger(siteDir, ledger);
   fs.writeFileSync(path.join(siteDir, ".nojekyll"), "", "utf8");
   console.log(`Built ${builtReleases} release output(s) across ${products.length} product(s).`);
 }
